@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>RC 电路交互示例</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    svg { border: 1px solid #ccc; background: #fafafa; }
+    text { font-size: 14px; user-select: none; }
+    rect, line, circle, g, polygon { cursor: pointer; }
+
+    /* 弹窗遮罩 */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      min-width: 260px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .modal h4 { margin-top: 0; }
+    .modal input {
+      width: 100%;
+      padding: 5px;
+      margin-top: 8px;
+      margin-bottom: 15px;
+    }
+    .modal button {
+      padding: 6px 12px;
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    /* 参数表格 */
+    table {
+      border-collapse: collapse;
+      margin-top: 20px;
+      width: 500px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px 12px;
+      text-align: center;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    input.table-input {
+      width: 80px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<h3>RC 低通滤波器电路</h3>
+
+<svg id="circuit" width="700" height="400">
+  <!-- Vin 电压源 -->
+  <circle id="Vin" cx="80" cy="150" r="20" fill="lightblue" stroke="black"/>
+  <text id="Vin-label" x="55" y="145">Vin: 5V</text>
+
+  <!-- Vin -> R1 -->
+  <line x1="100" y1="150" x2="180" y2="150" stroke="black" stroke-width="2"/>
+
+  <!-- R1 -->
+  <rect id="R1" x="180" y="140" width="60" height="20" fill="lightgray" stroke="black"/>
+  <text id="R1-label" x="180" y="135">R1: 1kΩ</text>
+
+  <!-- R1 -> 节点 (Vout) -->
+  <line x1="240" y1="150" x2="300" y2="150" stroke="black" stroke-width="2"/>
+
+  <!-- 节点输出 -->
+  <circle id="node" cx="300" cy="150" r="5" fill="black"/>
+  <text id="Vout-label" x="310" y="145">Vout: ? V</text>
+
+  <!-- 节点 -> C1 -> 地 -->
+  <line x1="300" y1="150" x2="300" y2="220" stroke="black" stroke-width="2"/>
+  <g id="C1">
+    <line x1="290" y1="220" x2="310" y2="220" stroke="black" stroke-width="2"/>
+    <line x1="290" y1="230" x2="310" y2="230" stroke="black" stroke-width="2"/>
+  </g>
+  <text id="C1-label" x="315" y="225">C1: 10uF</text>
+
+  <!-- C1 -> 地 -->
+  <line x1="300" y1="230" x2="300" y2="260" stroke="black" stroke-width="2"/>
+  <polygon points="280,260 320,260 300,280" fill="black"/> <!-- 地符号 -->
+
+  <!-- Vin 下接地 -->
+  <line x1="80" y1="170" x2="80" y2="220" stroke="black" stroke-width="2"/>
+  <polygon points="60,220 100,220 80,240" fill="black"/>
+</svg>
+
+<!-- 参数表格 -->
+<table>
+  <thead>
+    <tr>
+      <th>元件</th>
+      <th>类型</th>
+      <th>值</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Vin</td><td>电压源</td><td id="Vin-val">5V</td></tr>
+    <tr><td>R1</td><td>电阻</td><td id="R1-val">1kΩ</td></tr>
+    <tr><td>C1</td><td>电容</td><td id="C1-val">10uF</td></tr>
+    <tr>
+      <td>频率 f</td>
+      <td>Hz</td>
+      <td><input class="table-input" type="number" id="freq-input" value="1000"/></td>
+    </tr>
+    <tr><td>Vout</td><td>输出</td><td id="Vout-val">? V</td></tr>
+  </tbody>
+</table>
+
+<!-- 弹窗 -->
+<div id="overlay" class="modal-overlay">
+  <div class="modal">
+    <h4 id="modal-title">编辑参数</h4>
+    <label>
+      值：
+      <input type="text" id="param-input" />
+    </label>
+    <div>
+      <button id="save-btn">保存</button>
+      <button id="cancel-btn">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const components = {
+    Vin: { type: "电压源", value: "5V" },
+    R1: { type: "电阻", value: "1kΩ" },
+    C1: { type: "电容", value: "10uF" }
+  };
+
+  let currentId = null;
+
+  // 点击元件弹窗
+  ["Vin","R1","C1"].forEach(id => {
+    document.getElementById(id).addEventListener("click", () => openModal(id));
+  });
+
+  function openModal(id) {
+    currentId = id;
+    const comp = components[id];
+    document.getElementById("modal-title").textContent = `编辑 ${comp.type} ${id}`;
+    document.getElementById("param-input").value = comp.value;
+    document.getElementById("overlay").style.display = "flex";
+  }
+
+  function closeModal() {
+    document.getElementById("overlay").style.display = "none";
+    currentId = null;
+  }
+
+  document.getElementById("save-btn").addEventListener("click", () => {
+    if (currentId) {
+      const newValue = document.getElementById("param-input").value;
+      components[currentId].value = newValue;
+      document.getElementById(currentId + "-label").textContent = `${currentId}: ${newValue}`;
+      document.getElementById(currentId + "-val").textContent = newValue;
+      updateVout();
+    }
+    closeModal();
+  });
+  document.getElementById("cancel-btn").addEventListener("click", closeModal);
+
+  // 表格频率输入
+  const freqInput = document.getElementById("freq-input");
+  freqInput.addEventListener("input", updateVout);
+
+  // 解析数值
+  function parseValue(str) {
+    str = str.replace(/\s/g,"");
+    if (/k/i.test(str)) return parseFloat(str)*1e3;
+    if (/M/i.test(str)) return parseFloat(str)*1e6;
+    if (/u/i.test(str)) return parseFloat(str)*1e-6;
+    if (/n/i.test(str)) return parseFloat(str)*1e-9;
+    if (/p/i.test(str)) return parseFloat(str)*1e-12;
+    return parseFloat(str);
+  }
+
+  function updateVout() {
+    const Vin = parseValue(components.Vin.value);
+    const R = parseValue(components.R1.value);
+    const C = parseValue(components.C1.value);
+    const f = parseFloat(freqInput.value) || 1000;
+    const w = 2 * Math.PI * f;
+    const denom = Math.sqrt(1 + Math.pow(w*R*C,2));
+    const Vout = Vin / denom;
+
+    document.getElementById("Vout-label").textContent = `Vout: ${Vout.toFixed(2)} V`;
+    document.getElementById("Vout-val").textContent = `${Vout.toFixed(2)} V`;
+  }
+
+  updateVout();
+</script>
+
+</body>
+</html>
