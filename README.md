@@ -1,20 +1,48 @@
 # Interactive-Circuit-Module-Simulator
-交互式电路模块模拟器
 
-## 目录结构
-```bash
-circuit-simulator/
-├─ node_modules/          # 依赖包
-├─ public/                # 静态资源目录
-├─ src/                   # 源代码
-│  ├─ assets/             # 静态资源
-│  ├─ components/         # Vue 组件
-│  ├─ App.vue             # 根组件
-│  ├─ main.ts             # 程序入口
-│  └─ vite-env.d.ts       # TypeScript 类型声明
-├─ .gitignore             
-├─ index.html             # HTML 入口
-├─ package.json           # 项目依赖、脚本命令配置
-├─ tsconfig.json          # TypeScript 配置
-├─ vite.config.ts         # Vite 配置
+This template should help get you started developing with Vue 3 in Vite.
+
+## Recommended IDE Setup
+
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+
+## Recommended Browser Setup
+
+- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) 
+  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+- Firefox:
+  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
+  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+
+## Type Support for `.vue` Imports in TS
+
+TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vite.dev/config/).
+
+## Project Setup
+
+```sh
+pnpm install
+```
+
+### Compile and Hot-Reload for Development
+
+```sh
+pnpm dev
+```
+
+### Type-Check, Compile and Minify for Production
+
+```sh
+pnpm build
+```
+
+### Lint with [ESLint](https://eslint.org/)
+
+```sh
+pnpm lint
 ```
