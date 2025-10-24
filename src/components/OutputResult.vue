@@ -1,28 +1,12 @@
 <template>
-  <el-card class="box-card" header="仿真结果">
     <div v-if="!circuitStore.selectedCircuit">
-      <el-empty description="请先选择电路类型" />
+      <el-empty description="请先选择仿真模块" />
     </div>
     <div v-else-if="!circuitStore.simulationResult">
       <el-empty description="请先运行仿真" />
     </div>
     <div v-else class="simulation-results">
-      <div class="result-item">
-        <span class="label">输出电压：</span>
-        <span class="value">{{ circuitStore.simulationResult.voltage }} V</span>
-      </div>
-      <div class="result-item">
-        <span class="label">输出电流：</span>
-        <span class="value">{{ circuitStore.simulationResult.current }} A</span>
-      </div>
-      <div class="result-item" v-if="circuitStore.simulationResult.frequency">
-        <span class="label">频率：</span>
-        <span class="value">{{ circuitStore.simulationResult.frequency }} Hz</span>
-      </div>
-      <div class="result-item" v-if="circuitStore.simulationResult.phase">
-        <span class="label">相位：</span>
-        <span class="value">{{ circuitStore.simulationResult.phase }}°</span>
-      </div>
+      
     </div>
     <div class="actions">
       <el-button
@@ -33,8 +17,15 @@
       >
         {{ isRunning ? '计算中...' : '运行仿真' }}
       </el-button>
-    </div>
-  </el-card>
+      <el-button
+        type="success"
+        @click="exportResults"
+        :disabled="!circuitStore.selectedCircuit"
+        :loading="isExporting"
+      >
+        {{ isExporting ? '导出中...' : '导出结果' }}
+      </el-button>
+    </div>  
 </template>
 
 <script setup lang="ts">
@@ -51,13 +42,28 @@ async function runSimulation() {
 
   isRunning.value = true
   try {
-    // 模拟计算延迟
-    await new Promise((resolve) => setTimeout(resolve, 500))
     circuitStore.runSimulation()
   } catch (error) {
     console.error('仿真计算错误:', error)
   } finally {
     isRunning.value = false
+  }
+}
+
+const isExporting = ref(false)
+
+async function exportResults() {
+  if (!circuitStore.selectedCircuit) {
+    return
+  }
+
+  isExporting.value = true
+  try {
+    circuitStore.exportResults()
+  } catch (error) {
+    console.error('导出结果错误:', error)
+  } finally {
+    isExporting.value = false
   }
 }
 </script>

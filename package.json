@@ -1,6 +1,6 @@
 {
   "name": "circuit-simulator",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,10 +19,8 @@
   },
   "dependencies": {
     "element-plus": "^2.11.4",
-    "konva": "^10.0.2",
     "pinia": "^3.0.3",
     "vue": "^3.5.22",
-    "vue-konva": "^3.2.6",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {

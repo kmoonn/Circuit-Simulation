@@ -21,16 +21,22 @@
 
 <script setup lang="ts">
 import { useCircuitStore } from '@/stores/circuitStore'
-import { getCircuitTypesList } from '@/data/circuitData'
+import { getCircuitTypeById } from '@/data/circuitData'
 
 const circuitStore = useCircuitStore()
 const emit = defineEmits(['select'])
 
-// 使用电路数据文件中的电路类型
-const circuitOptions = getCircuitTypesList().map((circuit) => ({
-  value: circuit.id,
-  name: circuit.name,
-}))
+const files = import.meta.glob('@/circuits/*.svg', { eager: true })
+const circuitOptions = Object.keys(files)
+  .map((path) => {
+    const id = path.split('/').pop()?.replace('.svg', '') || ''
+    const info = getCircuitTypeById(id as string)
+    return {
+      value: id,
+      name: info?.name || id.toUpperCase(),
+    }
+  })
+  .sort((a, b) => a.name.localeCompare(b.name))
 
 function handleSelect(value: string) {
   emit('select', value)

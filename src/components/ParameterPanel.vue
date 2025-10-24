@@ -5,12 +5,7 @@
         <el-input v-model="component.type" disabled />
       </el-form-item>
       <el-form-item label="数值">
-        <el-input-number
-          v-model="componentValue"
-          :min="0"
-          :step="component.type === '电阻' ? 10 : component.type === '电容' ? 0.0001 : 0.001"
-          :precision="component.type === '电阻' ? 0 : 4"
-        />
+        <el-input v-model="componentValue" />
       </el-form-item>
       <el-form-item label="单位">
         <el-input v-model="component.unit" disabled />
@@ -44,7 +39,6 @@ watch(
 )
 watch(visible, (val) => emit('update:visible', val))
 
-// 组件数值的响应式引用
 const componentValue = computed({
   get: () => props.component?.value || 0,
   set: (value: number) => {
@@ -55,7 +49,6 @@ const componentValue = computed({
 })
 
 function save() {
-  console.log('保存参数', props.component)
   circuitStore.closeParameterPanel()
 }
 </script>

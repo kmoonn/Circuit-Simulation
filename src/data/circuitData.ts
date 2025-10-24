@@ -1,6 +1,5 @@
 import type { Component, CircuitConfig } from '@/stores/circuitStore'
 
-// 电路类型定义
 export interface CircuitType {
   id: string
   name: string
@@ -13,52 +12,26 @@ export interface CircuitType {
   }
 }
 
-// 预定义的电路配置
 export const circuitTypes: Record<string, CircuitType> = {
-  rc: {
-    id: 'rc',
-    name: 'RC 滤波电路',
-    description: '电阻电容滤波器，用于信号滤波和相位调整',
+  mos: {
+    id: 'mos',
+    name: 'MOS 模块电路',
+    description: '包含 MOS 管、输入电容、耦合电容、二极管和电感',
     components: [
-      { id: 'r1', type: '电阻', value: 100, unit: 'Ω', position: { x: 120, y: 180 } },
-      { id: 'c1', type: '电容', value: 0.001, unit: 'F', position: { x: 300, y: 190 } },
-    ],
-    input: { type: 'AC', value: 5, frequency: 1000 },
-  },
-  rl: {
-    id: 'rl',
-    name: 'RL 电感电路',
-    description: '电阻电感电路，用于电流控制和储能',
-    components: [
-      { id: 'r1', type: '电阻', value: 220, unit: 'Ω', position: { x: 100, y: 180 } },
-      { id: 'l1', type: '电感', value: 0.05, unit: 'H', position: { x: 300, y: 190 } },
-    ],
-    input: { type: 'AC', value: 5, frequency: 1000 },
-  },
-  rcl: {
-    id: 'rcl',
-    name: 'RCL 振荡电路',
-    description: '谐振振荡电路，用于频率选择和振荡',
-    components: [
-      { id: 'r1', type: '电阻', value: 150, unit: 'Ω', position: { x: 100, y: 180 } },
-      { id: 'l1', type: '电感', value: 0.05, unit: 'H', position: { x: 250, y: 190 } },
-      { id: 'c1', type: '电容', value: 0.001, unit: 'F', position: { x: 380, y: 190 } },
+      { id: 'Cin2', type: '电容', value: 0.00047, unit: 'F', position: { x: 36, y: 106 } },
+      { id: 'L10', type: '电感', value: 0.01, unit: 'H', position: { x: 121, y: 15 } },
+      { id: 'Diod', type: '二极管', value: 0.7, unit: 'V', position: { x: 336, y: 15 } },
+      { id: 'CB', type: '电容', value: 0.00047, unit: 'F', position: { x: 384, y: 107 } },
+      { id: 'MOS', type: 'MOS管', value: 2.0, unit: 'V', position: { x: 235, y: 92 } },
     ],
     input: { type: 'AC', value: 5, frequency: 1000 },
   },
 }
 
-// 获取所有电路类型列表
-export function getCircuitTypesList(): CircuitType[] {
-  return Object.values(circuitTypes)
-}
-
-// 根据ID获取电路类型
 export function getCircuitTypeById(id: string): CircuitType | null {
   return circuitTypes[id] || null
 }
 
-// 转换为store格式
 export function toCircuitConfig(circuitType: CircuitType): CircuitConfig {
   return {
     components: circuitType.components,
