@@ -1,3 +1,3 @@
 <template>
-    参数面板
+    仿真结果
 </template>
