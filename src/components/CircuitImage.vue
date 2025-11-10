@@ -20,6 +20,9 @@ export default {
 
 <style>
 .circuit {
-  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
 </style>

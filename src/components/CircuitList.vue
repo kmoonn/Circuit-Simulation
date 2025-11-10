@@ -3,9 +3,9 @@
     <div
       class="item"
       v-for="m in modules"
-      :key="m.id"
+      :key="m.moduleId"
       @click="select(m)"
-      :class="{ active: m.id === activeId }"
+      :class="{ active: m.moduleId === activeId }"
     >
       {{ m.name }}
     </div>
@@ -20,11 +20,23 @@ export default {
   emits: ["select"],
   setup(props, { emit }) {
     const modules = [
-      { id: 1, name: "mos" },
+      { 
+        moduleId: 1, 
+        name: "mos",
+        components: [
+          {id: 1, name: "输入电压", signal: "Vin", value: 0, unit: "V"},
+          {id: 2, name: "输出电压", signal: "Vout", value: 0, unit: "V"},
+          {id: 3, name: "额定功率", signal: "Pout", value: 0, unit: "W"}
+        ],
+        outputs: [
+          {id: 1, name: "结果1", signal: "符号1", value: 0, unit: "单位1"},
+          {id: 2, name: "结果2", signal: "符号2", value: 0, unit: "单位2"}
+        ]
+      },
     ]
 
     const select = (m) => {
-      emit("select", m.id)
+      emit("select", m)
     }
 
     return { modules, select }
@@ -57,7 +69,7 @@ export default {
 }
 
 .item.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, rgb(75, 129, 162) 100%);
   color: white;
   border-color: #667eea;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
