@@ -6,9 +6,9 @@
                 <span class="signal">({{ component.signal }})</span>
             </div>
             <div class="input-row">
-                <lay-input-number 
+                <lay-input-number
                     v-model="component.value"
-                    type="number" 
+                    type="number"
                     size="sm"
                     class="num-input"/>
                 <span class="unit">{{ component.unit }}</span>

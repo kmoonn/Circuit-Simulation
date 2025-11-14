@@ -57,7 +57,7 @@
                     <h3>仿真结果</h3>
                     <div class="button-group">
                       <lay-button type="primary" size="sm" @click="simulate">仿真</lay-button>
-                      <lay-button type="primary" size="sm" @click="export">导出</lay-button>
+                      <lay-button type="primary" size="sm" @click="exportDoc">导出</lay-button>
                     </div>
                   </div>
                 </div>
@@ -82,15 +82,51 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { ref } from "vue";
+import { saveAs } from "file-saver";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 
-import CircuitList from '@/components/CircuitList.vue'
-import CircuitImage from '@/components/CircuitImage.vue'
-import ParameterPanel from '@/components/ParameterPanel.vue'
-import ResultOutput from '@/components/ResultOutput.vue'
+import CircuitList from '@/components/CircuitList.vue';
+import CircuitImage from '@/components/CircuitImage.vue';
+import ParameterPanel from '@/components/ParameterPanel.vue';
+import ResultOutput from '@/components/ResultOutput.vue';
 
-const activeModule = ref(null)
+const activeModule = ref(null);
+
+const simulate = () => {
+  console.log("执行仿真逻辑");
+}
+
+const exportDoc = async () => {
+  if (!activeModule.value) return;
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: [
+        new Paragraph({
+          children: [
+            new TextRun({ text: "仿真结果文档", bold: true, size: 28 })
+          ]
+        }),
+        new Paragraph({ text: "" }),
+        ...activeModule.value.outputs.map(output =>
+          new Paragraph({
+            children: [
+              new TextRun({ text: `输出名称: ${output.name}`, bold: true }),
+              new TextRun({ text: `  值: ${output.value}` })
+            ]
+          })
+        )
+      ]
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "仿真结果.docx");
+};
 </script>
+
 
 <style>
 /* 整体布局 */
