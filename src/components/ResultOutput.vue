@@ -5,6 +5,10 @@
                 {{ output.name }}
                 <span class="signal">({{ output.signal }})</span>
             </div>
+            <div>
+                <span>{{ output.value }}</span>
+                <span v-if="output.unit"> {{ output.unit }}</span>
+            </div>
         </div>
     </div>
 </template>

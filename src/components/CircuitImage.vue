@@ -4,7 +4,7 @@
       <img src="../circuits/mos.jpg"></img>
     </div>
     <div v-else-if="moduleId === 2">
-
+      暂无该模块
     </div>
     <div v-else>请先在左侧选择电路模块</div>
   </div>

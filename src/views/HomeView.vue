@@ -56,8 +56,8 @@
                   <div class="panel-header-row">
                     <h3>仿真结果</h3>
                     <div class="button-group">
-                      <lay-button type="primary" size="sm" @click="simulate">仿真</lay-button>
-                      <lay-button type="primary" size="sm" @click="exportDoc">导出</lay-button>
+                      <lay-button type="primary" size="sm" @click="simulate" :disabled="!activeModule">仿真</lay-button>
+                      <lay-button type="primary" size="sm" @click="exportDoc" :disabled="!activeModule">导出</lay-button>
                     </div>
                   </div>
                 </div>
@@ -85,6 +85,7 @@
 import { ref } from "vue";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
+import { add, multiply } from "mathjs";
 
 import CircuitList from '@/components/CircuitList.vue';
 import CircuitImage from '@/components/CircuitImage.vue';
@@ -94,7 +95,37 @@ import ResultOutput from '@/components/ResultOutput.vue';
 const activeModule = ref(null);
 
 const simulate = () => {
-  console.log("执行仿真逻辑");
+  if (!activeModule.value) return;
+
+  const mod = activeModule.value;
+  const inputMap = Object.create(null);
+  for (const c of mod.components) {
+    inputMap[c.signal] = Number(c.value) || 0;
+  }
+
+  if (mod.moduleId === 1) {
+    const vin = inputMap["Vin"] ?? 0;
+    const vout = inputMap["Vout"] ?? 0;
+    const pout = inputMap["Pout"] ?? 0;
+
+    const result1 = add(vin, vout);
+    const result2 = pout;
+
+    mod.outputs = mod.outputs.map((o, idx) => ({
+      ...o,
+      value: idx === 0 ? result1 : result2
+    }));
+  } else if (mod.moduleId === 2) {
+    const r = inputMap["R"] ?? 0;
+    const c = inputMap["C"] ?? 0;
+    const vin = inputMap["Vin"] ?? 0;
+
+    const tau = multiply(r, c);
+    mod.outputs = mod.outputs.map((o, idx) => ({
+      ...o,
+      value: idx === 0 ? tau : vin
+    }));
+  }
 }
 
 const exportDoc = async () => {
@@ -106,7 +137,7 @@ const exportDoc = async () => {
       children: [
         new Paragraph({
           children: [
-            new TextRun({ text: "仿真结果文档", bold: true, size: 28 })
+            new TextRun({ text: "仿真结果", bold: true, size: 28})
           ]
         }),
         new Paragraph({ text: "" }),
