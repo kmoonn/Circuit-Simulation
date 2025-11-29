@@ -96,11 +96,11 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
 import { saveAs } from "file-saver";
-import { Document, Packer, Paragraph, TextRun } from "docx";
-import { add, multiply } from "mathjs";
-import { computeMOS } from '@/logic/mos.js'
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell } from "docx";
+import { multiply } from "mathjs";
+import modules from '@/modules/index.js'
 
 import CircuitList from '@/components/CircuitList.vue';
 import CircuitImage from '@/components/CircuitImage.vue';
@@ -109,174 +109,134 @@ import ResultOutput from '@/components/ResultOutput.vue';
 
 const activeModule = ref(null);
 const presetKind = ref('')
-const presetOptions = [
-  { label: 'DCM', value: 'DCM' },
-  { label: '临界', value: '临界' },
-  { label: 'CCM', value: 'CCM' }
-]
+const presetOptions = computed(() => {
+  const id = activeModule.value?.moduleId
+  return (id && modules[id]?.presetOptions) || []
+})
 const advice = ref([])
+
+const storageKey = (id) => `module-${id}`
+const persistModule = (mod) => {
+  const map = Object.create(null)
+  for (const c of mod.components) map[c.signal] = c.value
+  localStorage.setItem(storageKey(mod.moduleId), JSON.stringify(map))
+}
+const restoreModule = (mod) => {
+  const raw = localStorage.getItem(storageKey(mod.moduleId))
+  if (!raw) return
+  try {
+    const saved = JSON.parse(raw)
+    for (const c of mod.components) {
+      if (saved[c.signal] !== undefined) c.value = saved[c.signal]
+    }
+  } catch {}
+}
+watch(activeModule, (mod) => { if (mod) restoreModule(mod) }, { immediate: true })
+watch(() => activeModule.value && activeModule.value.components, () => { const mod = activeModule.value; if (mod) persistModule(mod) }, { deep: true })
 
 const reset = () => {
   if (!activeModule.value) return
-    const mod = activeModule.value
-    for (const c of mod.components) c.value = 0
-    mod.outputs = mod.outputs.map(o => ({ ...o, value: o.signal === 'Mode' ? '' : 0 }))
-    advice.value = []
-    presetKind.value = ''
-    return
+  const mod = activeModule.value
+  const ctrl = modules[mod.moduleId]
+  if (ctrl && ctrl.reset) ctrl.reset(mod)
+  advice.value = []
+  presetKind.value = ''
+  return
 }
 
 const simulate = () => {
-  if (!activeModule.value) return;
-
-  const mod = activeModule.value;
-  const inputMap = Object.create(null);
-  for (const c of mod.components) {
-    inputMap[c.signal] = Number(c.value) || 0;
-  }
-
+  if (!activeModule.value) return
+  const mod = activeModule.value
   if (mod.moduleId === 1) {
-    const res = computeMOS(inputMap)
-    mod.outputs = mod.outputs.map(o => ({
-      ...o,
-      value: typeof res[o.signal] === 'number' ? Number(res[o.signal].toFixed(3)) : res[o.signal]
-    }))
-    const vin = Number(inputMap['Vin']) || 0
-    const vout = Number(inputMap['Vout']) || 0
-    const lin = Number(inputMap['Lin']) || 0
-    advice.value = [
-      `状态：${res.Mode}`,
-      `MOS：电压 > ${vout} V，电流 > ${Number(res.ILpeak.toFixed(3))} A`,
-      `二极管：电压 > ${vout} V，电流 > ${Number(res.ILpeak.toFixed(3))} A`,
-      `差模电感：L = ${lin} H，@ILrms = ${Number(res.ILrms.toFixed(3))} A，峰值电流 > ${Number(res.ILpeak.toFixed(3))} A`,
-      `输入电容：容值 > ${Number(res.CinMin.toFixed(3))} uF，电压 > ${vin} V`,
-      `输出电容：容值 > ${Number(res.CoutMin.toFixed(3))} uF，电压 > ${vout} V`
-    ]
+    const ctrl = modules[1]
+    const { outputs, advice: adv } = ctrl.simulate(mod)
+    mod.outputs = outputs
+    advice.value = adv
   } else if (mod.moduleId === 2) {
-    const r = inputMap["R"] ?? 0;
-    const c = inputMap["C"] ?? 0;
-    const vin = inputMap["Vin"] ?? 0;
-
-    const tau = multiply(r, c);
+    const inputMap = Object.create(null)
+    for (const c of mod.components) inputMap[c.signal] = Number(c.value) || 0
+    const r = inputMap["R"] ?? 0
+    const c = inputMap["C"] ?? 0
+    const vin = inputMap["Vin"] ?? 0
+    const tau = multiply(r, c)
     mod.outputs = mod.outputs.map((o, idx) => ({
       ...o,
       value: idx === 0 ? tau : vin
-    }));
+    }))
   }
 }
 
 const exportDoc = async () => {
   if (!activeModule.value) return;
-
+  const mod = activeModule.value
+  const now = new Date()
+  const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+  const inputsTable = new Table({
+    rows: [
+      new TableRow({ children: [
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '参数', bold: true }) ] }) ] }),
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '信号', bold: true }) ] }) ] }),
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '值', bold: true }) ] }) ] }),
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '单位', bold: true }) ] }) ] })
+      ]}),
+      ...mod.components.map(c => new TableRow({ children: [
+        new TableCell({ children: [ new Paragraph(c.name) ] }),
+        new TableCell({ children: [ new Paragraph(c.signal) ] }),
+        new TableCell({ children: [ new Paragraph(String(c.value)) ] }),
+        new TableCell({ children: [ new Paragraph(c.unit || '') ] })
+      ]}))
+    ]
+  })
+  const outputsTable = new Table({
+    rows: [
+      new TableRow({ children: [
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '输出', bold: true }) ] }) ] }),
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '信号', bold: true }) ] }) ] }),
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '值', bold: true }) ] }) ] }),
+        new TableCell({ children: [ new Paragraph({ children: [ new TextRun({ text: '单位', bold: true }) ] }) ] })
+      ]}),
+      ...mod.outputs.map(o => new TableRow({ children: [
+        new TableCell({ children: [ new Paragraph(o.name) ] }),
+        new TableCell({ children: [ new Paragraph(o.signal) ] }),
+        new TableCell({ children: [ new Paragraph(String(o.value)) ] }),
+        new TableCell({ children: [ new Paragraph(o.unit || '') ] })
+      ]}))
+    ]
+  })
+  const advList = advice.value && advice.value.length > 0 ? advice.value.map(x => new Paragraph({ text: x, bullet: { level: 0 } })) : [ new Paragraph({ text: '无' }) ]
   const doc = new Document({
     sections: [{
       properties: {},
       children: [
-        new Paragraph({
-          children: [
-            new TextRun({ text: "仿真结果", bold: true, size: 28})
-          ]
-        }),
-        new Paragraph({ text: "" }),
-        ...activeModule.value.outputs.map(output =>
-          new Paragraph({
-            children: [
-              new TextRun({ text: `输出名称: ${output.name}`, bold: true }),
-              new TextRun({ text: `  值: ${output.value}` })
-            ]
-          })
-        )
+        new Paragraph({ children: [ new TextRun({ text: '仿真报告', bold: true, size: 32 }) ] }),
+        new Paragraph({ text: '' }),
+        new Paragraph({ children: [ new TextRun({ text: `模块：${mod.name}` }) ] }),
+        new Paragraph({ children: [ new TextRun({ text: `预设：${presetKind.value || '-'}` }) ] }),
+        new Paragraph({ children: [ new TextRun({ text: `导出时间：${ts}` }) ] }),
+        new Paragraph({ text: '' }),
+        new Paragraph({ children: [ new TextRun({ text: '输入参数', bold: true, size: 28 }) ] }),
+        inputsTable,
+        new Paragraph({ text: '' }),
+        new Paragraph({ children: [ new TextRun({ text: '仿真结果', bold: true, size: 28 }) ] }),
+        outputsTable,
+        new Paragraph({ text: '' }),
+        new Paragraph({ children: [ new TextRun({ text: '选型建议', bold: true, size: 28 }) ] }),
+        ...advList
       ]
     }]
-  });
-
-  const blob = await Packer.toBlob(doc);
-  saveAs(blob, "仿真结果.docx");
-};
-
-const setVal = (mod, sig, val) => {
-  const c = mod.components.find(x => x.signal === sig)
-  if (c) c.value = val
+  })
+  const fileName = `仿真结果_${mod.name}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.docx`
+  const blob = await Packer.toBlob(doc)
+  saveAs(blob, fileName)
 }
 
 const applyPreset = (val) => {
   const k = val || presetKind.value
-  if (k === 'DCM') presetDCM()
-  else if (k === '临界') presetCritical()
-  else if (k === 'CCM') presetCCM()
+  if (!activeModule.value) return
+  const mod = activeModule.value
+  const ctrl = modules[mod.moduleId]
+  if (ctrl && ctrl.applyPreset) ctrl.applyPreset(mod, k)
   simulate()
-}
-
-const presetDCM = () => {
-  if (!activeModule.value) return
-  const mod = activeModule.value
-  const Vin = 1000
-  const D = 0.3048
-  const Vout = Number((Vin * D).toFixed(3))
-  const Iout = 21.506
-  const PoutKw = Number(((Vout * Iout) / 1000).toFixed(3))
-  const Lin = 0.00015
-  const fres = 20000
-  const Rsingle = Number((Vout / Iout).toFixed(3))
-  const VinRipple = Number((Vin * 0.03).toFixed(3))
-  const VoutRipple = Number((Vout * 0.02).toFixed(3))
-  setVal(mod, 'Vin', Vin)
-  setVal(mod, 'Vout', Vout)
-  setVal(mod, 'Pout', PoutKw)
-  setVal(mod, 'Lin', Lin)
-  setVal(mod, 'fres', fres)
-  setVal(mod, 'Rsingle', Rsingle)
-  setVal(mod, 'VinRipple', VinRipple)
-  setVal(mod, 'VoutRipple', VoutRipple)
-  setVal(mod, 'ρ', 1)
-}
-
-const presetCritical = () => {
-  if (!activeModule.value) return
-  const mod = activeModule.value
-  const Vin = 1218.35
-  const D = 0.1878
-  const Vout = Number((Vin * D).toFixed(3))
-  const Iout = 21.506
-  const PoutKw = Number(((Vout * Iout) / 1000).toFixed(3))
-  const Lin = 0.000215
-  const fres = 20000
-  const Rsingle = Number((Vout / Iout).toFixed(3))
-  const VinRipple = Number((Vin * 0.03).toFixed(3))
-  const VoutRipple = Number((Vout * 0.02).toFixed(3))
-  setVal(mod, 'Vin', Vin)
-  setVal(mod, 'Vout', Vout)
-  setVal(mod, 'Pout', PoutKw)
-  setVal(mod, 'Lin', Lin)
-  setVal(mod, 'fres', fres)
-  setVal(mod, 'Rsingle', Rsingle)
-  setVal(mod, 'VinRipple', VinRipple)
-  setVal(mod, 'VoutRipple', VoutRipple)
-  setVal(mod, 'ρ', 1)
-}
-
-const presetCCM = () => {
-  if (!activeModule.value) return
-  const mod = activeModule.value
-  const Vin = 1250
-  const D = 0.1667
-  const Vout = Number((Vin * D).toFixed(3))
-  const Iout = 21.506
-  const PoutKw = Number(((Vout * Iout) / 1000).toFixed(3))
-  const Lin = 0.00022
-  const fres = 20000
-  const Rsingle = Number((Vout / Iout).toFixed(3))
-  const VinRipple = Number((Vin * 0.03).toFixed(3))
-  const VoutRipple = Number((Vout * 0.02).toFixed(3))
-  setVal(mod, 'Vin', Vin)
-  setVal(mod, 'Vout', Vout)
-  setVal(mod, 'Pout', PoutKw)
-  setVal(mod, 'Lin', Lin)
-  setVal(mod, 'fres', fres)
-  setVal(mod, 'Rsingle', Rsingle)
-  setVal(mod, 'VinRipple', VinRipple)
-  setVal(mod, 'VoutRipple', VoutRipple)
-  setVal(mod, 'ρ', 1)
 }
 </script>
 
