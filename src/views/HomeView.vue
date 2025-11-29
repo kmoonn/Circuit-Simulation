@@ -23,7 +23,7 @@
                 <div class="panel-header">
                   <h3>电路图</h3>
                 </div>
-                <div class="panel-content">
+                <div class="panel-content circuit-content">
                   <CircuitImage :moduleId="activeModule?.moduleId" />
                 </div>
               </div>
@@ -35,7 +35,7 @@
                 <div class="panel-header">
                   <h3>参数设置</h3>
                 </div>
-                <div class="panel-content">
+                <div class="panel-content param-content">
                   <div v-if="activeModule">
                     <ParameterPanel
                       v-for="component in activeModule.components"
@@ -58,16 +58,30 @@
                     <div class="button-group">
                       <lay-button type="primary" size="sm" @click="simulate" :disabled="!activeModule">仿真</lay-button>
                       <lay-button type="primary" size="sm" @click="exportDoc" :disabled="!activeModule">导出</lay-button>
+                      <lay-button type="danger" size="sm" @click="reset" :disabled="!activeModule">重置</lay-button>
+                      <lay-select v-model="presetKind" :options="presetOptions" placeholder="示例" size="sm" :disabled="!activeModule" style="width:100px" @change="applyPreset" />
                     </div>
                   </div>
                 </div>
                 <div class="panel-content">
                   <div v-if="activeModule">
-                    <ResultOutput
-                      v-for="output in activeModule.outputs"
-                      :key="output.id"
-                      :output="output"
-                    />
+                    <div class="result-content">
+                      <div class="result-grid">
+                        <ResultOutput
+                          v-for="output in activeModule.outputs"
+                          :key="output.id"
+                          :output="output"
+                        />
+                      </div>
+                    </div>
+                    <div class="panel" style="margin-top: 10px;">
+                      <div class="panel-header">
+                        <h3>选型建议</h3>
+                      </div>
+                      <div class="panel-content">
+                        <div v-for="(item, idx) in advice" :key="idx" style="padding:4px 0;">{{ item }}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -86,6 +100,7 @@ import { ref } from "vue";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { add, multiply } from "mathjs";
+import { computeMOS } from '@/logic/mos.js'
 
 import CircuitList from '@/components/CircuitList.vue';
 import CircuitImage from '@/components/CircuitImage.vue';
@@ -93,6 +108,23 @@ import ParameterPanel from '@/components/ParameterPanel.vue';
 import ResultOutput from '@/components/ResultOutput.vue';
 
 const activeModule = ref(null);
+const presetKind = ref('')
+const presetOptions = [
+  { label: 'DCM', value: 'DCM' },
+  { label: '临界', value: '临界' },
+  { label: 'CCM', value: 'CCM' }
+]
+const advice = ref([])
+
+const reset = () => {
+  if (!activeModule.value) return
+    const mod = activeModule.value
+    for (const c of mod.components) c.value = 0
+    mod.outputs = mod.outputs.map(o => ({ ...o, value: o.signal === 'Mode' ? '' : 0 }))
+    advice.value = []
+    presetKind.value = ''
+    return
+}
 
 const simulate = () => {
   if (!activeModule.value) return;
@@ -104,17 +136,22 @@ const simulate = () => {
   }
 
   if (mod.moduleId === 1) {
-    const vin = inputMap["Vin"] ?? 0;
-    const vout = inputMap["Vout"] ?? 0;
-    const pout = inputMap["Pout"] ?? 0;
-
-    const result1 = add(vin, vout);
-    const result2 = pout;
-
-    mod.outputs = mod.outputs.map((o, idx) => ({
+    const res = computeMOS(inputMap)
+    mod.outputs = mod.outputs.map(o => ({
       ...o,
-      value: idx === 0 ? result1 : result2
-    }));
+      value: typeof res[o.signal] === 'number' ? Number(res[o.signal].toFixed(3)) : res[o.signal]
+    }))
+    const vin = Number(inputMap['Vin']) || 0
+    const vout = Number(inputMap['Vout']) || 0
+    const lin = Number(inputMap['Lin']) || 0
+    advice.value = [
+      `状态：${res.Mode}`,
+      `MOS：电压 > ${vout} V，电流 > ${Number(res.ILpeak.toFixed(3))} A`,
+      `二极管：电压 > ${vout} V，电流 > ${Number(res.ILpeak.toFixed(3))} A`,
+      `差模电感：L = ${lin} H，@ILrms = ${Number(res.ILrms.toFixed(3))} A，峰值电流 > ${Number(res.ILpeak.toFixed(3))} A`,
+      `输入电容：容值 > ${Number(res.CinMin.toFixed(3))} uF，电压 > ${vin} V`,
+      `输出电容：容值 > ${Number(res.CoutMin.toFixed(3))} uF，电压 > ${vout} V`
+    ]
   } else if (mod.moduleId === 2) {
     const r = inputMap["R"] ?? 0;
     const c = inputMap["C"] ?? 0;
@@ -156,6 +193,91 @@ const exportDoc = async () => {
   const blob = await Packer.toBlob(doc);
   saveAs(blob, "仿真结果.docx");
 };
+
+const setVal = (mod, sig, val) => {
+  const c = mod.components.find(x => x.signal === sig)
+  if (c) c.value = val
+}
+
+const applyPreset = (val) => {
+  const k = val || presetKind.value
+  if (k === 'DCM') presetDCM()
+  else if (k === '临界') presetCritical()
+  else if (k === 'CCM') presetCCM()
+  simulate()
+}
+
+const presetDCM = () => {
+  if (!activeModule.value) return
+  const mod = activeModule.value
+  const Vin = 1000
+  const D = 0.3048
+  const Vout = Number((Vin * D).toFixed(3))
+  const Iout = 21.506
+  const PoutKw = Number(((Vout * Iout) / 1000).toFixed(3))
+  const Lin = 0.00015
+  const fres = 20000
+  const Rsingle = Number((Vout / Iout).toFixed(3))
+  const VinRipple = Number((Vin * 0.03).toFixed(3))
+  const VoutRipple = Number((Vout * 0.02).toFixed(3))
+  setVal(mod, 'Vin', Vin)
+  setVal(mod, 'Vout', Vout)
+  setVal(mod, 'Pout', PoutKw)
+  setVal(mod, 'Lin', Lin)
+  setVal(mod, 'fres', fres)
+  setVal(mod, 'Rsingle', Rsingle)
+  setVal(mod, 'VinRipple', VinRipple)
+  setVal(mod, 'VoutRipple', VoutRipple)
+  setVal(mod, 'ρ', 1)
+}
+
+const presetCritical = () => {
+  if (!activeModule.value) return
+  const mod = activeModule.value
+  const Vin = 1218.35
+  const D = 0.1878
+  const Vout = Number((Vin * D).toFixed(3))
+  const Iout = 21.506
+  const PoutKw = Number(((Vout * Iout) / 1000).toFixed(3))
+  const Lin = 0.000215
+  const fres = 20000
+  const Rsingle = Number((Vout / Iout).toFixed(3))
+  const VinRipple = Number((Vin * 0.03).toFixed(3))
+  const VoutRipple = Number((Vout * 0.02).toFixed(3))
+  setVal(mod, 'Vin', Vin)
+  setVal(mod, 'Vout', Vout)
+  setVal(mod, 'Pout', PoutKw)
+  setVal(mod, 'Lin', Lin)
+  setVal(mod, 'fres', fres)
+  setVal(mod, 'Rsingle', Rsingle)
+  setVal(mod, 'VinRipple', VinRipple)
+  setVal(mod, 'VoutRipple', VoutRipple)
+  setVal(mod, 'ρ', 1)
+}
+
+const presetCCM = () => {
+  if (!activeModule.value) return
+  const mod = activeModule.value
+  const Vin = 1250
+  const D = 0.1667
+  const Vout = Number((Vin * D).toFixed(3))
+  const Iout = 21.506
+  const PoutKw = Number(((Vout * Iout) / 1000).toFixed(3))
+  const Lin = 0.00022
+  const fres = 20000
+  const Rsingle = Number((Vout / Iout).toFixed(3))
+  const VinRipple = Number((Vin * 0.03).toFixed(3))
+  const VoutRipple = Number((Vout * 0.02).toFixed(3))
+  setVal(mod, 'Vin', Vin)
+  setVal(mod, 'Vout', Vout)
+  setVal(mod, 'Pout', PoutKw)
+  setVal(mod, 'Lin', Lin)
+  setVal(mod, 'fres', fres)
+  setVal(mod, 'Rsingle', Rsingle)
+  setVal(mod, 'VinRipple', VinRipple)
+  setVal(mod, 'VoutRipple', VoutRipple)
+  setVal(mod, 'ρ', 1)
+}
 </script>
 
 
@@ -244,6 +366,27 @@ const exportDoc = async () => {
   overflow: auto;
 }
 
+.param-content {
+  height: 380px;
+  overflow-y: auto;
+}
+
+.result-content {
+  height: 380px;
+  overflow-y: auto;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.circuit-content {
+  height: 380px;
+  overflow-y: auto;
+}
+
 /* 更自然的滚动体验 */
 .panel-content::-webkit-scrollbar {
   width: 6px;
@@ -268,6 +411,22 @@ const exportDoc = async () => {
 
   .body {
     padding: 10px;
+  }
+
+  .param-content {
+    height: 280px;
+  }
+
+  .result-content {
+    height: 280px;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .circuit-content {
+    height: 280px;
   }
 }
 </style>
